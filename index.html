@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Praxissemester Tracker</title>
+<link rel="stylesheet" href="styles.css">
+<!-- PWA-Unterstützung für iPhone/iPad (GitHub-Pages-Version). Inert in der
+     Electron-App am Mac - dort ändert sich dadurch nichts. -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0d0e1a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Praxissemester">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+</head>
+<body>
+
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">🎯</div>
+      <div>
+        <div class="brand-text">Praxissemester</div>
+        <div class="brand-sub">Tracker</div>
+      </div>
+    </div>
+
+    <ul class="nav-list" id="navList">
+      <li><button class="nav-item" data-page="dashboard"><span class="nav-icon">◆</span><span class="nav-label">Dashboard</span></button></li>
+      <li><button class="nav-item" data-page="unternehmen"><span class="nav-icon">🏢</span><span class="nav-label">Unternehmen</span></button></li>
+      <li><button class="nav-item" data-page="bewerbungen"><span class="nav-icon">📨</span><span class="nav-label">Bewerbungen</span></button></li>
+      <li><button class="nav-item" data-page="nachfassen"><span class="nav-icon">⏰</span><span class="nav-label">Nachfassen</span><span class="nav-badge" id="navBadgeNachfassen" hidden>0</span></button></li>
+      <li><button class="nav-item" data-page="dokumente"><span class="nav-icon">📄</span><span class="nav-label">Dokumente</span></button></li>
+      <li><button class="nav-item" data-page="hmprozess"><span class="nav-icon">🎓</span><span class="nav-label">HM-Prozess</span></button></li>
+      <li><button class="nav-item" data-page="termine"><span class="nav-icon">📅</span><span class="nav-label">Termine &amp; Fristen</span></button></li>
+      <li><button class="nav-item" data-page="archiv"><span class="nav-icon">🗄</span><span class="nav-label">Archiv</span></button></li>
+      <li><button class="nav-item" data-page="einstellungen"><span class="nav-icon">⚙</span><span class="nav-label">Einstellungen</span></button></li>
+    </ul>
+
+    <div class="sidebar-footer">
+      <span id="connState">Lade …</span>
+    </div>
+  </aside>
+
+  <main class="main-content">
+
+    <!-- ============================================================ DASHBOARD -->
+    <section class="page" id="page-dashboard">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Dashboard</h1>
+          <p class="page-subtitle">Mechatronik / Medizintechnik · Hochschule München · Erreichbarkeit ab Vaterstetten (30–45 Min. ÖPNV) · Industrieunternehmen bevorzugt, Fraunhofer ausdrücklich erwünscht</p>
+        </div>
+      </div>
+      <div class="kpi-grid" id="dashboardKpis"></div>
+      <div class="banner">
+        <strong>Wichtig:</strong> Werkverträge und Hiwi-/Werkstudentenverträge zählen NICHT als Praxissemester. Bei TUM-Instituten vorab einen echten Praktikumsvertrag einfordern. Zuständig für die inhaltliche Freigabe: Prof. Dr. Michael Hermann (Praktikantenbeauftragter FK06).
+      </div>
+      <div class="grid-2 section-block">
+        <div class="glass-card" style="padding:18px;">
+          <div class="section-block-title">Nächste Schritte</div>
+          <div id="dashNextSteps"></div>
+        </div>
+        <div class="glass-card" style="padding:18px;">
+          <div class="section-block-title">Fällige Nachfassaktionen</div>
+          <ul class="mini-list" id="dashFollowups"></ul>
+        </div>
+      </div>
+      <div class="grid-3 section-block">
+        <div class="glass-card" style="padding:18px;">
+          <div class="section-block-title">Zuletzt geändert</div>
+          <ul class="mini-list" id="dashRecent"></ul>
+        </div>
+        <div class="glass-card" style="padding:18px;">
+          <div class="section-block-title">Höchster Score</div>
+          <ul class="mini-list" id="dashTopScore"></ul>
+        </div>
+        <div class="glass-card" style="padding:18px;">
+          <div class="section-block-title">HM-Genehmigungsfortschritt</div>
+          <div id="dashHmProgress"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ UNTERNEHMEN -->
+    <section class="page" id="page-unternehmen">
+      <div id="unternehmenList">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Unternehmen</h1>
+            <p class="page-subtitle">Alle recherchierten Firmen — Industrie &amp; Fraunhofer bevorzugt, TUM nur als Backup.</p>
+          </div>
+        </div>
+        <div class="toolbar">
+          <input type="search" id="searchInput" placeholder="Suche nach Firma, Ort, Stichwort …" aria-label="Firmen durchsuchen">
+          <select id="statusFilter" aria-label="Nach Status filtern"></select>
+          <select id="phaseFilter" aria-label="Nach Bewerbungsphase filtern"></select>
+          <select id="categoryFilter" aria-label="Nach Kategorie filtern">
+            <option value="all">Alle Kategorien</option>
+            <option value="industry">Industrie</option>
+            <option value="medtech">Medizintechnik</option>
+            <option value="fraunhofer">Fraunhofer</option>
+            <option value="research">Forschungseinrichtung</option>
+            <option value="tum-backup">TUM-Backup</option>
+          </select>
+          <select id="sortSelect" aria-label="Sortierung"></select>
+          <span class="result-count" id="resultCount"></span>
+        </div>
+        <div class="toolbar toolbar-secondary">
+          <div class="tag-filter-bar" id="tagFilterBar"></div>
+          <div class="toolbar-checks">
+            <label class="toolbar-check"><input type="checkbox" id="docsOnlyCheck"> Vollständige Unterlagen</label>
+            <label class="toolbar-check"><input type="checkbox" id="followupOnlyCheck"> Nachfassen fällig</label>
+            <label class="toolbar-check"><input type="checkbox" id="initiativOnlyCheck"> Initiativbewerbung möglich</label>
+            <label class="toolbar-check"><input type="checkbox" id="concreteOnlyCheck"> Konkrete Stelle vorhanden</label>
+          </div>
+        </div>
+        <div class="company-list" id="cards"></div>
+        <p class="empty-state" id="cardsEmpty" hidden>Keine Firmen entsprechen der aktuellen Suche/Filterung.</p>
+
+        <div class="section-block" style="margin-top:32px;">
+          <div class="section-block-title">TUM-Backup — niedrige Priorität</div>
+          <div class="company-list" id="backupCards"></div>
+        </div>
+      </div>
+      <div id="unternehmenDetail" hidden></div>
+    </section>
+
+    <!-- ============================================================ BEWERBUNGEN -->
+    <section class="page" id="page-bewerbungen">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Bewerbungen</h1>
+          <p class="page-subtitle">Alle Firmen gruppiert nach Bewerbungsstatus.</p>
+        </div>
+      </div>
+      <div id="bewerbungenBoard"></div>
+    </section>
+
+    <!-- ============================================================ NACHFASSEN -->
+    <section class="page" id="page-nachfassen">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Nachfassen</h1>
+          <p class="page-subtitle">Standardregel: 14 Tage nach Versand ohne Antwort → Nachfassen empfohlen.</p>
+        </div>
+      </div>
+      <div class="grid-2" style="margin-bottom:14px;">
+        <div class="glass-card" style="padding:18px;">
+          <div class="section-block-title">Überfällig</div>
+          <ul class="mini-list" id="nfOverdue"></ul>
+        </div>
+        <div class="glass-card" style="padding:18px;">
+          <div class="section-block-title">Heute fällig</div>
+          <ul class="mini-list" id="nfToday"></ul>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="glass-card" style="padding:18px;">
+          <div class="section-block-title">In den nächsten 7 Tagen</div>
+          <ul class="mini-list" id="nfWeek"></ul>
+        </div>
+        <div class="glass-card" style="padding:18px;">
+          <div class="section-block-title">Erledigt / kein Nachfassen nötig</div>
+          <ul class="mini-list" id="nfDone"></ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ DOKUMENTE -->
+    <section class="page" id="page-dokumente">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Dokumente</h1>
+          <p class="page-subtitle">Allgemeine Unterlagen und alle Bewerbungsmappen an einem Ort.</p>
+        </div>
+      </div>
+      <div class="section-block">
+        <div class="section-block-title">Fehlende Unterlagen</div>
+        <div class="banner" id="missingDocsBanner" hidden></div>
+        <div class="glass-card" style="padding:6px 18px;" id="missingDocsChecklist"></div>
+      </div>
+      <div class="section-block">
+        <div class="section-block-title">Allgemeine Unterlagen</div>
+        <div class="grid-2" id="generalDocs"></div>
+      </div>
+      <div class="section-block">
+        <div class="section-block-title">Bewerbungsmappen pro Firma</div>
+        <div class="company-list" id="docsPerCompany"></div>
+      </div>
+    </section>
+
+    <!-- ============================================================ HM-PROZESS -->
+    <section class="page" id="page-hmprozess">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">HM-Genehmigungsprozess</h1>
+          <p class="page-subtitle">Schritt-für-Schritt-Ablauf, sobald eine Zusage steht — plus die wichtigsten Kontakte und Links.</p>
+        </div>
+      </div>
+
+      <div class="section-block">
+        <div class="section-block-title">Ansprechpartner</div>
+        <div id="hmContact"></div>
+      </div>
+
+      <div class="section-block">
+        <div class="section-block-title">Direkt-Links</div>
+        <div class="btn-row" id="hmLinks"></div>
+      </div>
+
+      <div class="section-block">
+        <div class="section-block-title">Ablauf (unbedingt in dieser Reihenfolge!)</div>
+        <ol class="hm-steps" id="hmSteps"></ol>
+      </div>
+
+      <div class="section-block">
+        <div class="section-block-title">Häufige Stolperfallen</div>
+        <ul class="hm-warn-list" id="hmWarnings"></ul>
+      </div>
+
+      <div class="section-block">
+        <div class="section-block-title">Checklisten pro Firma mit Zusage</div>
+        <div id="hmChecklists"></div>
+        <p class="empty-state" id="hmChecklistsEmpty" hidden>Noch keine Zusage — sobald eine Firma auf „Zusage” gesetzt wird, erscheint hier automatisch ihre Checkliste.</p>
+      </div>
+    </section>
+
+    <!-- ============================================================ TERMINE -->
+    <section class="page" id="page-termine">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Termine &amp; Fristen</h1>
+          <p class="page-subtitle">Alle anstehenden Termine chronologisch — aktuell primär Nachfassdaten.</p>
+        </div>
+      </div>
+      <ul class="mini-list" id="terminList"></ul>
+    </section>
+
+    <!-- ============================================================ ARCHIV -->
+    <section class="page" id="page-archiv">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Archiv</h1>
+          <p class="page-subtitle">Nicht mehr verfolgte Firmen — bleiben zu Referenzzwecken erhalten.</p>
+        </div>
+      </div>
+      <div class="company-list" id="archivedCards"></div>
+    </section>
+
+    <!-- ============================================================ EINSTELLUNGEN -->
+    <section class="page" id="page-einstellungen">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Einstellungen</h1>
+          <p class="page-subtitle">Datenspeicherort, Backups und technische Infos.</p>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="glass-card" style="padding:18px;">
+          <div class="section-block-title">Datenspeicherort</div>
+          <div id="settingsDataInfo"></div>
+        </div>
+        <div class="glass-card" style="padding:18px;">
+          <div class="section-block-title">Backups</div>
+          <div id="settingsBackupInfo"></div>
+        </div>
+      </div>
+      <div class="section-block">
+        <div class="glass-card" style="padding:18px;">
+          <div class="section-block-title">Cloud-Sync (Mac ⇄ iPad ⇄ iPhone)</div>
+          <div id="settingsSyncInfo"></div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script src="vendor/supabase-js.min.js"></script>
+<script src="config.js"></script>
+<script src="sync.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
