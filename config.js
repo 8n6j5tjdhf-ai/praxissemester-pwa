@@ -8,6 +8,6 @@
 // Platzhalter stehen, bleibt die App exakt im heutigen Offline-Modus -
 // Sync.isConfigured() erkennt das automatisch.
 window.CONFIG = {
-  SUPABASE_URL: 'https://DEIN-PROJEKT.supabase.co',
-  SUPABASE_ANON_KEY: 'DEIN-ANON-KEY',
+  SUPABASE_URL: 'https://yqllwtbpvkjxbncdqgpq.supabase.co',
+  SUPABASE_ANON_KEY: 'sb_publishable_Ro_Wt8XrneDPtvrtkY2zTg_IJXbETVM',
 };
