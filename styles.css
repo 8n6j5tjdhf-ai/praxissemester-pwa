@@ -444,19 +444,20 @@ textarea.notes::placeholder { color: var(--text-faint); }
 .sidebar-backdrop { display: none; }
 
 @media (max-width: 640px) {
+  /* position:fixed statt sticky: iOS behandelt env(safe-area-inset-top) bei
+     sticky-Elementen innerhalb eines scrollenden Containers unzuverlässig
+     (bekannte WebKit-Eigenheit in "Zum Home-Bildschirm hinzugefügt"-Apps -
+     das war die Ursache der hartnäckigen Lücke). fixed ist der von Apple
+     dafür vorgesehene, zuverlässige Fall - dieselbe Technik wie bei der
+     Sidebar-Schublade weiter unten, die von Anfang an korrekt funktioniert
+     hat. main-content bekommt dafür oben Platz reserviert (siehe unten). */
   .mobile-topbar {
     display: flex; align-items: center; gap: 12px;
-    position: sticky; top: 0; z-index: 20;
+    position: fixed; top: 0; left: 0; right: 0; z-index: 20;
     background: var(--sidebar-bg); backdrop-filter: blur(28px) saturate(180%);
     border-bottom: 1px solid var(--border);
     padding: 14px 16px;
-    /* Als Home-Bildschirm-App reserviert iOS oben Platz für Notch/Statusleiste
-       (nur wirksam dank viewport-fit=cover im <meta name=viewport>) - ohne
-       das hier draufzuaddieren rutscht der Inhalt der Leiste darunter. */
     padding-top: max(14px, env(safe-area-inset-top));
-    /* .main-content hat eigenes Padding - negative Ränder ziehen die Leiste
-       bis an den Bildschirmrand, statt mit Lücken links/rechts zu schweben. */
-    margin: -18px -16px 16px;
   }
   .mobile-menu-btn {
     background: none; border: none; color: var(--text); font-size: 19px;
@@ -491,7 +492,10 @@ textarea.notes::placeholder { color: var(--text-faint); }
   }
   .sidebar-backdrop.visible { opacity: 1; pointer-events: auto; }
 
-  .main-content { padding: 18px 16px max(50px, env(safe-area-inset-bottom)); }
+  /* Oben: Platz für die jetzt fixierte (nicht mehr im Fluss stehende)
+     Topbar reservieren - deren Höhe hängt vom Gerät ab (Notch/Dynamic
+     Island), daher hier großzügig mitgerechnet statt eines festen Werts. */
+  .main-content { padding: calc(58px + env(safe-area-inset-top)) 16px max(50px, env(safe-area-inset-bottom)); }
   .page-title { font-size: 19px; }
   .kpi-num { font-size: 21px; }
   .btn { padding: 9px 14px; }
