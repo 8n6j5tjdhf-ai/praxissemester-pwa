@@ -8,7 +8,7 @@
 // Cached wird ausschließlich die statische App-Shell, NIE Supabase-Antworten
 // oder sonstige Daten - iOS Safari hat kein verlässliches Background-Sync,
 // ein "funktioniert komplett offline"-Versprechen wäre hier irreführend.
-const CACHE_NAME = 'praxissemester-shell-v1';
+const CACHE_NAME = 'praxissemester-shell-v2';
 const SHELL_FILES = [
   './',
   './index.html',
@@ -41,15 +41,17 @@ self.addEventListener('fetch', (event) => {
   // Nur eigene, statische GET-Requests cachen - alles Richtung Supabase
   // (anderer Origin) oder jede Nicht-GET-Anfrage läuft unverändert durch.
   if (event.request.method !== 'GET' || url.origin !== self.location.origin) return;
+  // Network-first, Cache nur als Offline-Fallback: die vorherige
+  // "cache-first mit Hintergrund-Update"-Strategie zeigte nach jedem Deploy
+  // beim ersten Laden immer noch den alten Stand (Update kam erst beim
+  // zweiten Neuladen an) - für eine sich noch häufig ändernde App wichtiger,
+  // bei bestehender Verbindung immer den aktuellen Code zu laden.
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      const network = fetch(event.request)
-        .then((res) => {
-          if (res.ok) caches.open(CACHE_NAME).then((cache) => cache.put(event.request, res.clone()));
-          return res;
-        })
-        .catch(() => cached);
-      return cached || network;
-    })
+    fetch(event.request)
+      .then((res) => {
+        if (res.ok) caches.open(CACHE_NAME).then((cache) => cache.put(event.request, res.clone()));
+        return res;
+      })
+      .catch(() => caches.match(event.request))
   );
 });
