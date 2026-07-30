@@ -432,3 +432,54 @@ textarea.notes::placeholder { color: var(--text-faint); }
   .nav-item { justify-content: center; }
   .main-content { padding: 20px 18px 50px; }
 }
+
+/* ===================================================== phone (≤640px) ====
+   10 Nav-Punkte sind zu viele für eine Bottom-Tab-Bar (iOS-Konvention: max.
+   ~5) und eine reine Icon-Leiste ohne Beschriftung ist auf einem 375px
+   breiten Screen kaum lesbar. Deshalb ab hier: Sidebar wird zur
+   ausklappbaren Schublade (mit vollen Beschriftungen, wie am Desktop),
+   ausgelöst über ein Hamburger-Icon in einer schmalen oberen Leiste -
+   Hauptinhalt bekommt dadurch die volle Bildschirmbreite. */
+.mobile-topbar { display: none; }
+.sidebar-backdrop { display: none; }
+
+@media (max-width: 640px) {
+  .mobile-topbar {
+    display: flex; align-items: center; gap: 12px;
+    position: sticky; top: 0; z-index: 20;
+    background: var(--sidebar-bg); backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 16px;
+  }
+  .mobile-menu-btn {
+    background: none; border: none; color: var(--text); font-size: 19px;
+    line-height: 1; cursor: pointer; padding: 4px 2px; font-family: inherit;
+  }
+  .mobile-topbar-title { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
+
+  .sidebar {
+    position: fixed; top: 0; left: 0; height: 100%; width: min(268px, 82vw);
+    z-index: 40; transform: translateX(-100%);
+    transition: transform .22s var(--ease);
+    box-shadow: var(--shadow-md);
+  }
+  .sidebar.mobile-open { transform: translateX(0); }
+  /* Innerhalb der Schublade ist genug Platz - Beschriftungen wieder
+     einblenden (überschreibt die Icon-only-Regel aus dem 900px-Breakpoint,
+     wirkt per Reihenfolge in der Datei). */
+  .brand-text, .brand-sub, .nav-item span.nav-label { display: block; }
+  .nav-item span.nav-label { display: inline; }
+  .nav-item { justify-content: flex-start; }
+
+  .sidebar-backdrop {
+    display: block; position: fixed; inset: 0; z-index: 39;
+    background: rgba(6, 7, 16, 0.55);
+    opacity: 0; pointer-events: none; transition: opacity .2s var(--ease);
+  }
+  .sidebar-backdrop.visible { opacity: 1; pointer-events: auto; }
+
+  .main-content { padding: 18px 16px 50px; }
+  .page-title { font-size: 19px; }
+  .kpi-num { font-size: 21px; }
+  .btn { padding: 9px 14px; }
+}

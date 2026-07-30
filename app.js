@@ -518,8 +518,24 @@ function switchPage(page) {
   document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
   document.getElementById('page-' + page)?.classList.add('active');
   document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.page === page));
+  const activeLabel = document.querySelector('.nav-item.active .nav-label');
+  const topbarTitle = document.getElementById('mobileTopbarTitle');
+  if (topbarTitle && activeLabel) topbarTitle.textContent = activeLabel.textContent;
+  closeMobileNav();
   if (page === 'unternehmen' && !NAV.companyId) showCompanyList();
   renderCurrentPage();
+}
+
+// Schublade fürs Handy-Layout (≤640px, siehe styles.css) - auf breiteren
+// Bildschirmen ist die Sidebar ohnehin permanent sichtbar, diese Funktionen
+// sind dort einfach wirkungslose No-Ops.
+function openMobileNav() {
+  document.getElementById('sidebar')?.classList.add('mobile-open');
+  document.getElementById('sidebarBackdrop')?.classList.add('visible');
+}
+function closeMobileNav() {
+  document.getElementById('sidebar')?.classList.remove('mobile-open');
+  document.getElementById('sidebarBackdrop')?.classList.remove('visible');
 }
 function renderCurrentPage() {
   const renderers = {
@@ -539,6 +555,8 @@ function renderNavBadges() {
 function initNav() {
   document.querySelectorAll('.nav-item').forEach(btn => btn.addEventListener('click', () => switchPage(btn.dataset.page)));
   document.getElementById('posteingangScanBtn')?.addEventListener('click', scanPosteingang);
+  document.getElementById('mobileMenuBtn')?.addEventListener('click', openMobileNav);
+  document.getElementById('sidebarBackdrop')?.addEventListener('click', closeMobileNav);
 }
 
 // ============================================================== Dashboard
