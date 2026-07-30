@@ -1045,20 +1045,23 @@ const SHORTCUT_NAME = 'Bewerbung senden';
 // iCloud-Drive-Ordner holt (siehe electron/main.js: sync-documents-to-icloud)
 // und daraus einen fertigen, aber ungesendeten Mail-Entwurf baut - genau wie
 // beim Mac-Weg entscheidet immer erst der Nutzer selbst über "Senden".
+//
+// mappeFilePath ist bereits der fertige relative Pfad (Firma/Dateiname), die
+// Aktion "Datei aus Ordner laden" im Kurzbefehl kann ihn direkt verwenden -
+// kein Filtern/Durchsuchen von Ordnerinhalten nötig. Abitur/Immatrikulation
+// haben feste, im Kurzbefehl selbst hinterlegte Dateinamen (ändern sich nie),
+// die App schickt dafür nur die beiden Checkbox-Werte aus c.mappeOptions.
 function buildShortcutPayload(c) {
   const primaryKey = c.primaryDocument || DEFAULT_PRIMARY_DOCUMENT;
   const primaryPath = (c.documents || {})[primaryKey];
   const opts = c.mappeOptions || {};
-  const sharedFiles = [];
-  if (opts.includeAbitur) sharedFiles.push('2023_07_06_Abitur.pdf');
-  if (opts.includeImmatrikulation) sharedFiles.push('Immatrikulationsbescheinigung-auch-BAfoeG-Deutsche-Bahn-Familienkasse-fuer-das-SoSe-2026_ME-B.pdf');
   return {
     to: c.email || '',
     subject: c.emailSubject || '',
     body: c.emailBody || '',
-    companyFolder: c.folder || '',
-    files: primaryPath ? [fileNameFromPath(primaryPath)] : [],
-    sharedFiles,
+    mappeFilePath: primaryPath && c.folder ? `${c.folder}/${fileNameFromPath(primaryPath)}` : '',
+    includeAbitur: !!opts.includeAbitur,
+    includeImmatrikulation: !!opts.includeImmatrikulation,
   };
 }
 function openShortcutMail(c) {
