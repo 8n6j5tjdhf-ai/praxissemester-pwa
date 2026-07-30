@@ -857,6 +857,10 @@ function renderEmailWorkflowBox(c) {
   const hasEmail = !!c.email;
   const hasPortal = !!c.careerPortal;
   if (!hasEmail && !hasPortal) return '';
+  // Echte Cloud-PWA (iPhone/iPad ohne lokalen server.py): weder das Electron-
+  // AppleScript noch der /api/.../prepare-email-Weg funktionieren hier (kein
+  // Backend erreichbar) - dafür der Kurzbefehl-Weg, siehe openShortcutMail().
+  const cloudPwa = !window.electronAPI && !LOCAL_MODE;
 
   return `
     <div class="doc-box">
@@ -865,11 +869,15 @@ function renderEmailWorkflowBox(c) {
       <p style="font-size:12px; color:var(--text-muted); margin:0 0 10px;">
         ${window.electronAPI
           ? '„Mail-Entwurf mit Anhang öffnen“ öffnet ein echtes, bearbeitbares Mail.app-Fenster mit Empfänger, Betreff, Text und der Bewerbungsmappe bereits angehängt — dort nur noch kurz prüfen und selbst auf Senden klicken. (Ein bloß geöffnetes .eml zeigt in Mail.app nur eine Vorschau ohne Senden-Button — deshalb dieser Weg.)'
+          : cloudPwa
+          ? '„Mail mit Anhang vorbereiten“ ruft den Kurzbefehl „' + SHORTCUT_NAME + '“ auf, der Empfänger/Betreff/Text setzt und die Dokumente aus iCloud Drive anhängt — Mail öffnet sich als fertiger Entwurf zum Prüfen, gesendet wird immer nur von dir selbst. Voraussetzung: der Kurzbefehl ist eingerichtet (siehe Einstellungen) und die Dokumente wurden einmal über die Mac-App nach iCloud kopiert.'
           : 'Bester Weg: „.eml mit Anhang erzeugen“ legt eine fertige E-Mail inkl. Bewerbungsmappe als Anhang an. Browser können .eml-Dateien meist nur herunterladen, nicht direkt als Entwurf öffnen — die heruntergeladene Datei danach in Mail/Outlook öffnen und dort senden.'}
         mailto: bleibt als Fallback (öffnet ohne Anhang, Anhang danach manuell hinzufügen; technisch bedingt, mailto: kann keine Dateien anhängen).
       </p>
       <div class="btn-row">
-        <button class="btn btn-primary" id="prepEmlBtn">${window.electronAPI ? '✉️ Mail-Entwurf mit Anhang öffnen' : '📎 .eml mit Anhang erzeugen'}</button>
+        ${cloudPwa
+          ? `<button class="btn btn-primary" id="prepShortcutBtn">✉️ Mail mit Anhang vorbereiten (Kurzbefehl)</button>`
+          : `<button class="btn btn-primary" id="prepEmlBtn">${window.electronAPI ? '✉️ Mail-Entwurf mit Anhang öffnen' : '📎 .eml mit Anhang erzeugen'}</button>`}
         <button class="btn" id="prepMailBtn">mailto: öffnen (ohne Anhang)</button>
         <button class="btn" id="markSentBtn" ${alreadySent ? 'disabled' : ''}>${alreadySent ? '✓ Bereits als versendet markiert' : 'Als versendet markieren'}</button>
       </div>
@@ -960,6 +968,7 @@ function attachDetailHandlers(root, c) {
   }));
   root.querySelector('[data-mailto]')?.addEventListener('click', () => openMailto(c));
   root.querySelector('#prepMailBtn')?.addEventListener('click', () => openMailto(c));
+  root.querySelector('#prepShortcutBtn')?.addEventListener('click', () => openShortcutMail(c));
   root.querySelector('#markSentBtn')?.addEventListener('click', () => {
     setCompanyStatus(c, 'Beworben');
     scheduleSave();
@@ -1023,6 +1032,39 @@ function attachDetailHandlers(root, c) {
 function openMailto(c) {
   const url = `mailto:${c.email}?subject=${encodeURIComponent(c.emailSubject || '')}&body=${encodeURIComponent(c.emailBody || '')}`;
   if (window.electronAPI) window.electronAPI.openExternal(url); else window.location.href = url;
+}
+
+// Name des vom Nutzer einmalig in der Kurzbefehle-App angelegten Shortcuts -
+// muss exakt so heißen, siehe Einstellungen-Anleitung.
+const SHORTCUT_NAME = 'Bewerbung senden';
+
+// Für die echte Cloud-PWA (iPhone/iPad ohne lokalen server.py): mailto: kann
+// keine Anhänge transportieren, und es gibt kein Backend, das ein .eml bauen
+// könnte. Stattdessen wird ein auf dem Gerät einmalig eingerichteter
+// Kurzbefehl aufgerufen (siehe Einstellungen), der die Dokumente aus dem
+// iCloud-Drive-Ordner holt (siehe electron/main.js: sync-documents-to-icloud)
+// und daraus einen fertigen, aber ungesendeten Mail-Entwurf baut - genau wie
+// beim Mac-Weg entscheidet immer erst der Nutzer selbst über "Senden".
+function buildShortcutPayload(c) {
+  const primaryKey = c.primaryDocument || DEFAULT_PRIMARY_DOCUMENT;
+  const primaryPath = (c.documents || {})[primaryKey];
+  const opts = c.mappeOptions || {};
+  const sharedFiles = [];
+  if (opts.includeAbitur) sharedFiles.push('2023_07_06_Abitur.pdf');
+  if (opts.includeImmatrikulation) sharedFiles.push('Immatrikulationsbescheinigung-auch-BAfoeG-Deutsche-Bahn-Familienkasse-fuer-das-SoSe-2026_ME-B.pdf');
+  return {
+    to: c.email || '',
+    subject: c.emailSubject || '',
+    body: c.emailBody || '',
+    companyFolder: c.folder || '',
+    files: primaryPath ? [fileNameFromPath(primaryPath)] : [],
+    sharedFiles,
+  };
+}
+function openShortcutMail(c) {
+  const payload = buildShortcutPayload(c);
+  const url = `shortcuts://run-shortcut?name=${encodeURIComponent(SHORTCUT_NAME)}&input=text&text=${encodeURIComponent(JSON.stringify(payload))}`;
+  window.location.href = url;
 }
 
 // ------------------------------------------------------- shared doc/timeline
@@ -1321,6 +1363,12 @@ function renderArchiv() {
 
 let mailScanResults = []; // { id, sender, subject, dateReceivedISO, companyId, category }
 
+// Gesetzt einmalig in init(). Unterscheidet "Mac-App/Browser gegen lokalen
+// server.py" von "echte Cloud-PWA ohne jeden lokalen Server" - relevant für
+// Render-Funktionen, die synchron entscheiden müssen, welcher Anhang-Workflow
+// überhaupt möglich ist (siehe renderEmailWorkflowBox).
+let LOCAL_MODE = false;
+
 function renderPosteingang() {
   const el = document.getElementById('posteingangResults');
   const msgEl = document.getElementById('posteingangMsg');
@@ -1470,6 +1518,72 @@ function renderEinstellungen() {
   `;
   document.getElementById('openBackupFolderBtn')?.addEventListener('click', () => window.electronAPI.showInFinder('praxissemester-tracker/data/backups'));
   renderSyncSettings();
+  renderIcloudSettings();
+}
+
+// ------------------------------------------------------- iCloud/Kurzbefehl UI
+// Macht die Bewerbungsmappen-PDFs am iPhone/iPad erreichbar, ohne eigenen
+// Cloud-Speicher/Server: iCloud Drive übernimmt den reinen Dateitransport
+// (macOS synct automatisch), ein einmalig vom Nutzer angelegter Kurzbefehl
+// übernimmt das Zusammensetzen eines Mail-Entwurfs mit Anhang auf dem Handy
+// (siehe openShortcutMail()). Der Kopiervorgang selbst läuft nur am Mac
+// (electron/main.js: sync-documents-to-icloud) - additiv, nie
+// verschiebend/löschend.
+function renderIcloudSettings() {
+  const el = document.getElementById('settingsIcloudInfo');
+  if (!el) return;
+  const guide = `
+    <details class="section-collapse" style="margin-top:12px;">
+      <summary>Kurzbefehl „${SHORTCUT_NAME}“ einmalig einrichten (Anleitung)</summary>
+      <div style="font-size:12.5px; line-height:1.7; margin-top:8px;">
+        <p><b>1.</b> Kurzbefehle-App auf dem iPhone öffnen → <b>+</b> (neuer Kurzbefehl) → Namen exakt
+        <code>${SHORTCUT_NAME}</code> vergeben (über „…“ → Umbenennen).</p>
+        <p><b>2.</b> Aktion <b>„Text“</b> hinzufügen — bleibt leer, dient nur als Ziel für „Kurzbefehl-Eingabe empfangen“:
+        stattdessen bei den Kurzbefehl-Details ganz oben „Übergeben an: Kurzbefehl” aktivieren und als Eingabetyp <b>Text</b> wählen.</p>
+        <p><b>3.</b> Aktion <b>„Wörterbuch aus Eingabe abrufen“</b> hinzufügen (Kategorie Skripting) — als Eingabe die Kurzbefehl-Eingabe (Text) verwenden.
+        Das ergibt ein Wörterbuch mit den Feldern <code>to</code>, <code>subject</code>, <code>body</code>, <code>companyFolder</code>, <code>files</code>, <code>sharedFiles</code>.</p>
+        <p><b>4.</b> Einmal <b>„Ordner abrufen“</b> hinzufügen und auf <code>iCloud Drive → Praxissemester-Bewerbungen</code> zeigen (per Auswahldialog).
+        Dann <b>„Inhalt von Ordner abrufen“</b> mit Unterordner = Wert „companyFolder“ aus dem Wörterbuch (Ordner innerhalb von Praxissemester-Bewerbungen wählen: Variable einfügen).</p>
+        <p><b>5.</b> <b>„Dateien filtern“</b> auf das Ergebnis von Schritt 4: Bedingung „Name“ „ist in“ Wörterbuchwert <code>files</code>. Ergebnis zwischenspeichern (Variable „Anhänge Firma“).</p>
+        <p><b>6.</b> Gleiches nochmal für die gemeinsamen Dokumente: „Inhalt von Ordner abrufen“ für den Unterordner <code>Gemeinsame-Dokumente</code>, dann „Dateien filtern“ mit Bedingung „Name“ „ist in“ Wörterbuchwert <code>sharedFiles</code> (Variable „Anhänge Gemeinsam“).</p>
+        <p><b>7.</b> <b>„Listen kombinieren“</b> (oder einfach beide Anhang-Variablen direkt im nächsten Schritt verwenden) → Aktion <b>„E-Mail senden“</b>:
+        An = Wörterbuchwert <code>to</code>, Betreff = <code>subject</code>, Nachricht = <code>body</code>, Anhänge = beide Datei-Variablen aus Schritt 5+6.
+        Wichtig: <b>„Vor dem Senden anzeigen“ MUSS aktiviert sein</b> (Standard) — der Kurzbefehl öffnet dann nur einen fertigen Entwurf, gesendet wird ausschließlich von dir per eigenem Tippen auf „Senden“.</p>
+        <p><b>8.</b> Fertig. Ab jetzt: in der App auf „Mail mit Anhang vorbereiten“ tippen → Kurzbefehle-App fragt kurz um Erlaubnis (einmalig) → Mail öffnet sich mit allem schon drin.</p>
+        <p style="color:var(--text-faint); margin-top:10px;">Testen wir am besten gemeinsam beim ersten Mal — Apple ändert die genauen Bezeichnungen der Kurzbefehle-Aktionen gelegentlich zwischen iOS-Versionen.</p>
+      </div>
+    </details>`;
+
+  if (window.electronAPI) {
+    el.innerHTML = `
+      <p style="font-size:12.8px; color:var(--text-muted); line-height:1.6;">
+        Kopiert alle Bewerbungsmappen (+ Abitur/Immatrikulation, falls vorhanden) nach
+        <code>iCloud Drive/Praxissemester-Bewerbungen/</code> — nie verschoben, nur zusätzlich kopiert.
+        macOS synct das automatisch, danach erscheinen die Dateien auch in der „Dateien“-App am iPhone/iPad.
+      </p>
+      <div class="btn-row"><button class="btn btn-primary" id="icloudSyncBtn">Dokumente nach iCloud kopieren</button></div>
+      <p id="icloudSyncMsg" style="font-size:12.5px; margin-top:8px;"></p>
+      ${guide}`;
+    document.getElementById('icloudSyncBtn').addEventListener('click', async () => {
+      const msgEl = document.getElementById('icloudSyncMsg');
+      msgEl.textContent = 'Kopiere …';
+      try {
+        const res = await window.electronAPI.syncDocumentsToIcloud({ companies: DATA.companies });
+        if (!res.ok) throw new Error(res.error || 'Unbekannter Fehler');
+        msgEl.textContent = `✓ ${res.copiedCount} Datei(en) kopiert/aktualisiert.` + (res.errors.length ? ` ${res.errors.length} Fehler: ${res.errors.join('; ')}` : '');
+      } catch (e) {
+        msgEl.textContent = 'Fehler: ' + e.message;
+      }
+    });
+  } else {
+    el.innerHTML = `
+      <p style="font-size:12.8px; color:var(--text-muted); line-height:1.6;">
+        Die Dokumente werden über die Mac-App nach iCloud Drive kopiert (Button dort in
+        „Einstellungen“) — von hier aus nicht auslösbar. Sind sie einmal kopiert, tauchen sie
+        automatisch auch hier auf und der Kurzbefehl kann sie beim E-Mail-Vorbereiten anhängen.
+      </p>
+      ${guide}`;
+  }
 }
 
 // ------------------------------------------------------------ Cloud-Sync UI
@@ -1647,8 +1761,8 @@ async function init() {
   populateToolbar();
   setupElectronBridge();
 
-  const localMode = await Sync.hasLocalServer();
-  if (!localMode && Sync.isConfigured() && !(await Sync.getSession())) {
+  LOCAL_MODE = await Sync.hasLocalServer();
+  if (!LOCAL_MODE && Sync.isConfigured() && !(await Sync.getSession())) {
     renderLoginGate();
     return;
   }
@@ -1660,12 +1774,12 @@ async function init() {
     if (Sync.isConfigured() && (await Sync.getSession())) setupRealtimeSync();
     // Service Worker nur in der PWA registrieren (siehe sw.js) - in der
     // Electron-App würde er riskieren, veraltete Dateien zwischenzuspeichern.
-    if (!localMode && 'serviceWorker' in navigator) {
+    if (!LOCAL_MODE && 'serviceWorker' in navigator) {
       navigator.serviceWorker.register('sw.js').catch((e) => console.warn('Service Worker Registrierung fehlgeschlagen:', e));
     }
   } catch (e) {
     setConn('err');
-    document.querySelector('.main-content').innerHTML = localMode
+    document.querySelector('.main-content').innerHTML = LOCAL_MODE
       ? `<div class="glass-card" style="padding:24px; margin-top:40px;"><b>Server nicht erreichbar.</b><br>Bitte <code>python3 server.py</code> im Ordner praxissemester-tracker starten und die Seite über http://127.0.0.1:8420/ öffnen.<br><button class="btn btn-primary" onclick="init()" style="margin-top:12px;">Erneut versuchen</button></div>`
       : `<div class="glass-card" style="padding:24px; margin-top:40px;"><b>Cloud-Daten konnten nicht geladen werden.</b><br>${escapeHtml(e.message)}<br><button class="btn btn-primary" onclick="init()" style="margin-top:12px;">Erneut versuchen</button></div>`;
     console.error(e);
