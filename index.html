@@ -31,6 +31,7 @@
       <li><button class="nav-item" data-page="unternehmen"><span class="nav-icon">🏢</span><span class="nav-label">Unternehmen</span></button></li>
       <li><button class="nav-item" data-page="bewerbungen"><span class="nav-icon">📨</span><span class="nav-label">Bewerbungen</span></button></li>
       <li><button class="nav-item" data-page="nachfassen"><span class="nav-icon">⏰</span><span class="nav-label">Nachfassen</span><span class="nav-badge" id="navBadgeNachfassen" hidden>0</span></button></li>
+      <li><button class="nav-item" data-page="posteingang"><span class="nav-icon">📥</span><span class="nav-label">Posteingang</span></button></li>
       <li><button class="nav-item" data-page="dokumente"><span class="nav-icon">📄</span><span class="nav-label">Dokumente</span></button></li>
       <li><button class="nav-item" data-page="hmprozess"><span class="nav-icon">🎓</span><span class="nav-label">HM-Prozess</span></button></li>
       <li><button class="nav-item" data-page="termine"><span class="nav-icon">📅</span><span class="nav-label">Termine &amp; Fristen</span></button></li>
@@ -166,6 +167,22 @@
           <ul class="mini-list" id="nfDone"></ul>
         </div>
       </div>
+    </section>
+
+    <!-- ============================================================ POSTEINGANG -->
+    <section class="page" id="page-posteingang">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Posteingang</h1>
+          <p class="page-subtitle">Liest lokal in Mail.app nach neuen Antworten auf Bewerbungen (nur lesend, nichts wird versendet/gelöscht). Jede Zuordnung braucht eine manuelle Bestätigung.</p>
+        </div>
+        <div class="page-header-actions">
+          <button class="btn btn-primary" id="posteingangScanBtn">Jetzt prüfen</button>
+        </div>
+      </div>
+      <p class="page-subtitle" id="posteingangLastScan" style="margin-bottom:6px;"></p>
+      <p class="page-subtitle" id="posteingangMsg" style="margin-bottom:14px;"></p>
+      <div id="posteingangResults"></div>
     </section>
 
     <!-- ============================================================ DOKUMENTE -->

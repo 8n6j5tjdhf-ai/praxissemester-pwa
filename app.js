@@ -141,6 +141,69 @@ const FOLLOWUP_RULES = [
   },
 ];
 
+// ============================================================ Posteingang
+// Nur Vorschläge: die Zuordnung Firma<->E-Mail und die Kategorie sind eine
+// Heuristik, keine Statusänderung passiert ohne Klick auf "Übernehmen". Die
+// eigentliche Mail wird nur lesend über electron/main.js (Mail.app-
+// AppleScript) geholt - keine eigenen Zugangsdaten, siehe README.
+const CATEGORY_RULES = [
+  { key: 'absage', label: 'Absage', regex: /\babsagen?\b|\bablehnen?\b|\babgelehnt\b|leider.{0,80}(nicht|keine)|keine.{0,30}(praktikumsplätze|praktikumsstellen|kapazität(en)?|vakanz(en)?|freien? (plätze|stellen))|(anderen?|andere) bewerber|entschieden.{0,15}gegen|nicht.{0,15}berücksichtigen|absehen/i },
+  { key: 'einladung', label: 'Vorstellungsgespräch', regex: /vorstellungsgespräch|einladen|kennenlernen|gespräch.{0,15}vereinbaren|\binterview\b/i },
+  { key: 'eingangsbestaetigung', label: 'Eingangsbestätigung', regex: /eingangsbestätigung|bewerbung.{0,15}eingegangen|erhalten.{0,15}haben|dank.{0,15}für.{0,15}ihre bewerbung/i },
+  { key: 'rueckfrage', label: 'Rückfrage', regex: /rückfrage|frage(n)? zu ihrer bewerbung|kurze frage/i },
+  { key: 'unterlagen', label: 'Weitere Unterlagen', regex: /weitere unterlagen|zusätzliche(n)? (unterlagen|dokumente)|bitte (senden|reichen) sie/i },
+];
+const CATEGORY_LABELS = Object.fromEntries([...CATEGORY_RULES.map(r => [r.key, r.label]), ['sonstige', 'Sonstige']]);
+// Kategorie -> Statuswechsel beim "Übernehmen" (skipTimeline, weil wir selbst
+// einen aussagekräftigeren Timeline-Eintrag mit Bezug zur E-Mail schreiben).
+// "unterlagen"/"sonstige" haben keinen 1:1-Status - dort wird nur eine Notiz
+// in der Timeline ergänzt, ohne den Status anzufassen.
+const CATEGORY_TO_STATUS = {
+  absage: 'Absage', einladung: 'Vorstellungsgespräch',
+  eingangsbestaetigung: 'Eingangsbestätigung erhalten', rueckfrage: 'Rückfrage',
+};
+const CATEGORY_TIMELINE_TYPE = { absage: 'absage', einladung: 'interview', eingangsbestaetigung: 'eingangsbestaetigung', rueckfrage: 'rueckfrage' };
+// E-Mail-Anbieter, die niemals als "das ist die Firmendomain" zählen dürfen,
+// falls sich mal ein privates Postfach in ein Feld verirrt.
+const GENERIC_MAIL_DOMAINS = new Set(['gmail.com', 't-online.de', 'web.de', 'gmx.de', 'gmx.net', 'outlook.com', 'hotmail.com', 'icloud.com', 'yahoo.com']);
+
+function extractDomain(url) {
+  if (!url) return null;
+  try {
+    const withProto = /^https?:\/\//i.test(url) ? url : 'https://' + url;
+    const host = new URL(withProto).hostname.replace(/^www\./i, '').toLowerCase();
+    return host || null;
+  } catch { return null; }
+}
+// Bewusst NUR email/website, nicht careerPortal: viele Firmen teilen sich
+// dieselbe ATS-Plattform (Personio/Greenhouse/...) - ein Portal-Domain-Treffer
+// würde sonst Antworten für die falsche Firma vorschlagen können.
+function companyDomains(c) {
+  const domains = new Set();
+  const emailDomain = c.email ? (c.email.split('@')[1] || '').toLowerCase() : null;
+  if (emailDomain && !GENERIC_MAIL_DOMAINS.has(emailDomain)) domains.add(emailDomain);
+  const webDomain = extractDomain(c.website);
+  if (webDomain && !GENERIC_MAIL_DOMAINS.has(webDomain)) domains.add(webDomain);
+  return [...domains];
+}
+function senderEmailOf(senderField) {
+  const m = /<([^>]+)>/.exec(senderField || '');
+  return (m ? m[1] : senderField || '').trim().toLowerCase();
+}
+function senderMatchesDomains(senderField, domains) {
+  const senderDomain = (senderEmailOf(senderField).split('@')[1] || '');
+  if (!senderDomain) return false;
+  return domains.some(d => senderDomain === d || senderDomain.endsWith('.' + d));
+}
+function classifyMail(subject) {
+  const hit = CATEGORY_RULES.find(r => r.regex.test(subject || ''));
+  return hit ? hit.key : 'sonstige';
+}
+function earliestApplicationDate() {
+  const dates = DATA.companies.map(c => c.applicationDate).filter(Boolean).sort();
+  return dates[0] || addDaysISO(todayISO(), -30);
+}
+
 const SORT_OPTIONS = [
   { key: 'score', label: 'Score (Standard)' },
   { key: 'fit', label: 'Beste fachliche Übereinstimmung' },
@@ -462,7 +525,7 @@ function renderCurrentPage() {
   const renderers = {
     dashboard: renderDashboard, unternehmen: renderUnternehmenPage, bewerbungen: renderBewerbungenBoard,
     nachfassen: renderNachfassen, dokumente: renderDokumente, hmprozess: renderHmProzess,
-    termine: renderTermine, archiv: renderArchiv, einstellungen: renderEinstellungen,
+    termine: renderTermine, archiv: renderArchiv, posteingang: renderPosteingang, einstellungen: renderEinstellungen,
   };
   renderers[NAV.page]?.();
   renderNavBadges();
@@ -475,6 +538,7 @@ function renderNavBadges() {
 }
 function initNav() {
   document.querySelectorAll('.nav-item').forEach(btn => btn.addEventListener('click', () => switchPage(btn.dataset.page)));
+  document.getElementById('posteingangScanBtn')?.addEventListener('click', scanPosteingang);
 }
 
 // ============================================================== Dashboard
@@ -1251,6 +1315,139 @@ function renderArchiv() {
   wrap.querySelectorAll('.company-card[data-id]').forEach(el => el.addEventListener('click', () => {
     switchPage('unternehmen'); showCompanyDetail(el.dataset.id);
   }));
+}
+
+// =========================================================== Posteingang page
+
+let mailScanResults = []; // { id, sender, subject, dateReceivedISO, companyId, category }
+
+function renderPosteingang() {
+  const el = document.getElementById('posteingangResults');
+  const msgEl = document.getElementById('posteingangMsg');
+  if (!el) return;
+
+  if (!window.electronAPI || !window.electronAPI.scanMailReplies) {
+    el.innerHTML = '<p class="empty-state">Der Posteingangs-Abgleich läuft nur in der Mac-App (liest lokal aus Mail.app) — auf dem iPhone/iPad nicht verfügbar.</p>';
+    document.getElementById('posteingangScanBtn')?.setAttribute('disabled', 'true');
+    return;
+  }
+
+  const lastScan = DATA.mailScanState && DATA.mailScanState.lastScannedAt;
+  document.getElementById('posteingangLastScan').textContent = lastScan
+    ? `Zuletzt geprüft: ${fmtDate(lastScan.slice(0, 10))} ${lastScan.slice(11, 16)} Uhr`
+    : 'Noch nie geprüft.';
+
+  if (!mailScanResults.length) {
+    el.innerHTML = '<p class="mini-empty">Noch keine Treffer — auf „Jetzt prüfen" klicken.</p>';
+    return;
+  }
+
+  const byCompany = {};
+  mailScanResults.forEach((m) => { (byCompany[m.companyId] = byCompany[m.companyId] || []).push(m); });
+
+  el.innerHTML = Object.entries(byCompany).map(([companyId, msgs]) => {
+    const c = companyById(companyId);
+    if (!c) return '';
+    return `
+      <div class="glass-card" style="padding:16px; margin-bottom:14px;">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+          <div class="logo-avatar" style="background:${colorForId(c.id)}">${c.logoInitials || c.name.slice(0, 2).toUpperCase()}</div>
+          <b>${escapeHtml(c.name)}</b>
+          <span class="status-pill ${STATUS_CLASS[c.status] || ''}">${c.status}</span>
+        </div>
+        ${msgs.map((m) => `
+          <div class="mail-hit" data-mail-id="${escapeAttr(m.id)}" style="border-top:1px solid var(--border); padding:10px 0;">
+            <div style="font-size:12.5px; color:var(--text-muted);">${escapeHtml(m.sender)} · ${fmtDate(m.dateReceivedISO.slice(0, 10))}</div>
+            <div style="font-size:13px; font-weight:600; margin:2px 0 8px;">${escapeHtml(m.subject)}</div>
+            <div class="btn-row">
+              <select class="status-select mail-category-select" data-mail-id="${escapeAttr(m.id)}">
+                ${Object.entries(CATEGORY_LABELS).map(([key, label]) => `<option value="${key}" ${key === m.category ? 'selected' : ''}>${label}</option>`).join('')}
+              </select>
+              <button class="btn btn-primary btn-sm mail-apply-btn" data-mail-id="${escapeAttr(m.id)}" data-company-id="${c.id}">Übernehmen</button>
+              <button class="btn btn-sm mail-ignore-btn" data-mail-id="${escapeAttr(m.id)}">Ignorieren</button>
+            </div>
+          </div>`).join('')}
+      </div>`;
+  }).join('');
+
+  el.querySelectorAll('.mail-apply-btn').forEach((btn) => btn.addEventListener('click', () => {
+    const mailId = btn.dataset.mailId;
+    const c = companyById(btn.dataset.companyId);
+    const match = mailScanResults.find((m) => m.id === mailId);
+    const select = el.querySelector(`.mail-category-select[data-mail-id="${CSS.escape(mailId)}"]`);
+    const category = select ? select.value : match.category;
+    const label = CATEGORY_LABELS[category] || category;
+    const note = `Erkannt aus E-Mail „${match.subject}" von ${match.sender} (${fmtDate(match.dateReceivedISO.slice(0, 10))}) — Kategorie: ${label}`;
+    const mappedStatus = CATEGORY_TO_STATUS[category];
+    if (mappedStatus) {
+      setCompanyStatus(c, mappedStatus, { skipTimeline: true });
+      addTimelineEvent(c, CATEGORY_TIMELINE_TYPE[category], note);
+    } else {
+      addTimelineEvent(c, 'notiz', note);
+    }
+    markMailSeen(mailId);
+    scheduleSave();
+    renderNavBadges();
+    if (NAV.page === 'dashboard') renderDashboard();
+  }));
+  el.querySelectorAll('.mail-ignore-btn').forEach((btn) => btn.addEventListener('click', () => {
+    markMailSeen(btn.dataset.mailId);
+  }));
+
+  function markMailSeen(mailId) {
+    DATA.mailScanState = DATA.mailScanState || { seenIds: [] };
+    DATA.mailScanState.seenIds = DATA.mailScanState.seenIds || [];
+    if (!DATA.mailScanState.seenIds.includes(mailId)) DATA.mailScanState.seenIds.push(mailId);
+    mailScanResults = mailScanResults.filter((m) => m.id !== mailId);
+    scheduleSave();
+    renderPosteingang();
+  }
+}
+
+async function scanPosteingang() {
+  const msgEl = document.getElementById('posteingangMsg');
+  if (msgEl) msgEl.textContent = 'Prüfe Posteingang …';
+  try {
+    const sinceISO = earliestApplicationDate();
+    const res = await window.electronAPI.scanMailReplies({ sinceISO });
+    if (!res.ok) throw new Error(res.error || 'Unbekannter Fehler');
+    const seenIds = new Set((DATA.mailScanState && DATA.mailScanState.seenIds) || []);
+    const results = [];
+    for (const m of res.messages) {
+      if (seenIds.has(m.id)) continue;
+      for (const c of DATA.companies) {
+        const domains = companyDomains(c);
+        if (!domains.length) continue;
+        if (senderMatchesDomains(m.sender, domains)) {
+          results.push({ ...m, companyId: c.id, category: classifyMail(m.subject) });
+          break; // erste passende Firma gewinnt, keine Doppel-Zuordnung
+        }
+      }
+    }
+    // Bei einer Antwort auf den eigenen Bewerbungs-Thread bleibt der Betreff
+    // oft unverändert (z.B. "Initiativbewerbung fürs Praxissemester") und die
+    // eigentliche Aussage (Absage/Einladung/...) steht nur im Text. Deshalb
+    // für die (kleine) Trefferliste zusätzlich den Inhalt holen und die
+    // Kategorie damit neu bestimmen - bewusst erst NACH der Domain-Zuordnung,
+    // damit nicht für alle 300 gescannten Mails der Inhalt geladen wird.
+    if (results.length && window.electronAPI.getMailContent) {
+      const contentRes = await window.electronAPI.getMailContent({ sinceISO, ids: results.map(r => r.id) });
+      if (contentRes.ok) {
+        results.forEach((r) => {
+          const contentExcerpt = contentRes.contents[r.id] || '';
+          r.category = classifyMail(r.subject + ' ' + contentExcerpt);
+        });
+      }
+    }
+    mailScanResults = results;
+    DATA.mailScanState = DATA.mailScanState || {};
+    DATA.mailScanState.lastScannedAt = new Date().toISOString();
+    scheduleSave();
+    if (msgEl) msgEl.textContent = results.length ? `✓ ${results.length} Treffer gefunden.` : '✓ Geprüft — keine neuen Treffer.';
+    renderPosteingang();
+  } catch (e) {
+    if (msgEl) msgEl.textContent = 'Fehler: ' + e.message;
+  }
 }
 
 // ============================================================ Einstellungen page
