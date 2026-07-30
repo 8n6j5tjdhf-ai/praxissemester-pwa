@@ -557,6 +557,10 @@ function initNav() {
   document.getElementById('posteingangScanBtn')?.addEventListener('click', scanPosteingang);
   document.getElementById('mobileMenuBtn')?.addEventListener('click', openMobileNav);
   document.getElementById('sidebarBackdrop')?.addEventListener('click', closeMobileNav);
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-doc-path]');
+    if (btn) handleDocLinkClick(btn);
+  });
 }
 
 // ============================================================== Dashboard
@@ -838,7 +842,7 @@ function renderBewerbungsmappeBox(c) {
   const primaryPath = docs[primaryKey];
   const present = !!primaryPath;
   const opts = c.mappeOptions || {};
-  const subLinks = Object.keys(docs).filter(k => k !== primaryKey).map(k => `<a href="/${docs[k]}" target="_blank">${DOCUMENT_LABELS[k] || k}</a>`).join('');
+  const subLinks = Object.keys(docs).filter(k => k !== primaryKey).map(k => docLink(docs[k], DOCUMENT_LABELS[k] || k, '')).join('');
   const optionRows = OPTIONAL_MAPPE_DOCS.map(o => `
     <label class="mappe-opt${o.path ? '' : ' disabled'}">
       <input type="checkbox" class="mappe-opt-check" data-opt="${o.key}" ${opts[o.key] ? 'checked' : ''} ${o.path ? '' : 'disabled'}>
@@ -855,7 +859,7 @@ function renderBewerbungsmappeBox(c) {
       <div class="doc-meta" style="margin-top:10px;">Standard-Inhalt: Anschreiben, Lebenslauf, Notenübersicht. Zusätzlich mitschicken (wird beim E-Mail-Versand als eigene, separate Datei angehängt — für eine gemeinsame PDF stattdessen unten "Neue Version generieren" klicken):</div>
       <div class="mappe-opts">${optionRows}</div>
       <div class="btn-row" style="margin-top:12px;">
-        ${present ? `<a class="btn btn-primary" href="/${primaryPath}" target="_blank">Öffnen</a>` : ''}
+        ${docLink(primaryPath, 'Öffnen', 'btn btn-primary')}
         ${window.electronAPI ? `<button class="btn finder-btn" data-folder="Bewerbungen/${c.folder}">Im Finder anzeigen</button>` : ''}
         <button class="btn replace-btn" data-doc="${primaryKey}">Datei ersetzen</button>
         <button class="btn regen-btn">Neue Version generieren</button>
@@ -892,13 +896,13 @@ function renderEmailWorkflowBox(c) {
         ${window.electronAPI
           ? '„Mail-Entwurf mit Anhang öffnen“ öffnet ein echtes, bearbeitbares Mail.app-Fenster mit Empfänger, Betreff, Text und der Bewerbungsmappe bereits angehängt — dort nur noch kurz prüfen und selbst auf Senden klicken. (Ein bloß geöffnetes .eml zeigt in Mail.app nur eine Vorschau ohne Senden-Button — deshalb dieser Weg.)'
           : cloudPwa
-          ? '„mailto: öffnen“ startet Mail mit Empfänger/Betreff/Text bereits ausgefüllt. Anhang danach kurz selbst hinzufügen: in Mail auf das Büroklammer-Symbol → „Datei durchsuchen“ → Dateien-App → iCloud Drive → Praxissemester-Bewerbungen → ' + escapeHtml(c.folder || '<Firma>') + ' → Bewerbungsmappe auswählen (Voraussetzung: einmal über die Mac-App nach iCloud kopiert, siehe Einstellungen).'
+          ? 'Bester Weg: unten bei „Bewerbungsmappe“ auf „Öffnen“ tippen — die PDF öffnet sich im Browser, dort oben rechts auf das Teilen-Symbol tippen und „Mail“ wählen — öffnet einen Mail-Entwurf mit der Datei bereits angehängt (Empfänger/Text sind darin aber leer). Dafür unten „E-Mail-Adresse kopieren“ und „E-Mail-Text kopieren“ nutzen und in diesen Entwurf einfügen. Voraussetzung fürs Öffnen: einmal über die Mac-App in Einstellungen auf „Dokumente in Cloud hochladen“ geklickt.'
           : 'Bester Weg: „.eml mit Anhang erzeugen“ legt eine fertige E-Mail inkl. Bewerbungsmappe als Anhang an. Browser können .eml-Dateien meist nur herunterladen, nicht direkt als Entwurf öffnen — die heruntergeladene Datei danach in Mail/Outlook öffnen und dort senden.'}
         ${cloudPwa ? '' : 'mailto: bleibt als Fallback (öffnet ohne Anhang, Anhang danach manuell hinzufügen; technisch bedingt, mailto: kann keine Dateien anhängen).'}
       </p>
       <div class="btn-row">
         ${cloudPwa
-          ? `<button class="btn btn-primary" id="prepMailBtn">✉️ mailto: öffnen (Anhang danach selbst hinzufügen)</button>`
+          ? `<button class="btn" id="prepMailBtn">✉️ mailto: öffnen (ohne Anhang)</button>`
           : `<button class="btn btn-primary" id="prepEmlBtn">${window.electronAPI ? '✉️ Mail-Entwurf mit Anhang öffnen' : '📎 .eml mit Anhang erzeugen'}</button>
         <button class="btn" id="prepMailBtn">mailto: öffnen (ohne Anhang)</button>`}
         <button class="btn" id="markSentBtn" ${alreadySent ? 'disabled' : ''}>${alreadySent ? '✓ Bereits als versendet markiert' : 'Als versendet markieren'}</button>
@@ -909,7 +913,7 @@ function renderEmailWorkflowBox(c) {
       <div class="btn-row" style="margin-top:8px;">
         <button class="btn btn-sm" data-copy="${escapeAttr(c.email)}">E-Mail-Adresse kopieren</button>
         <button class="btn btn-sm" id="copyEmailTextBtn">E-Mail-Text kopieren</button>
-        ${emlPath ? `<a class="btn btn-sm" href="/${emlPath}" target="_blank">.eml öffnen/erneut ansehen</a>` : ''}
+        ${docLink(emlPath, '.eml öffnen/erneut ansehen', 'btn btn-sm')}
         ${window.electronAPI && emlPath ? `<button class="btn btn-sm finder-btn" data-folder="Bewerbungen/${c.folder}">.eml im Finder anzeigen</button>` : ''}
       </div>
       <span class="copy-feedback" id="emailCopyFeedback"></span>
@@ -918,7 +922,7 @@ function renderEmailWorkflowBox(c) {
       <button class="btn" id="markSentBtn" ${alreadySent ? 'disabled' : ''}>${alreadySent ? '✓ Bereits als versendet markiert' : 'Als versendet markieren'}</button></div>`}
       <p style="font-size:12.5px; margin:12px 0 6px;"><b>${primaryPath ? `Bewerbungsmappe: ${fileNameFromPath(primaryPath)}` : 'Bewerbungsmappe fehlt noch — bitte zuerst generieren.'}</b></p>
       <div class="btn-row">
-        ${primaryPath ? `<a class="btn btn-sm" href="/${primaryPath}" target="_blank">Bewerbungsmappe öffnen</a>` : ''}
+        ${docLink(primaryPath, 'Bewerbungsmappe öffnen', cloudPwa ? 'btn btn-primary btn-sm' : 'btn btn-sm')}
         ${window.electronAPI && primaryPath ? `<button class="btn btn-sm finder-btn" data-folder="Bewerbungen/${c.folder}">Im Finder anzeigen</button>` : ''}
         ${primaryPath ? `<button class="btn btn-sm" data-copy-path="/${primaryPath}">Dateipfad kopieren</button>` : ''}
       </div>
@@ -1052,6 +1056,34 @@ function attachDetailHandlers(root, c) {
   });
 
   attachDocAndTimelineHandlers(root, c);
+}
+
+// Auf dem Mac (server.py) und in jedem lokalen Browser ist ein Dokument per
+// simplem relativen Pfad erreichbar (LOCAL_MODE) - klassisches <a href>. In
+// der echten Cloud-PWA gibt es dafür kein Backend; stattdessen holt ein Klick
+// asynchron eine zeitlich begrenzte signierte URL aus Supabase Storage (siehe
+// sync.js: getSignedUrl/uploadDocument, sowie den Upload-Button in
+// Einstellungen). Deshalb hier ein Button mit data-doc-path statt <a href>,
+// der globale Klick-Handler dafür wird einmalig in initNav() gebunden.
+function docLink(relPath, label, cls) {
+  if (!relPath) return '';
+  if (LOCAL_MODE) return `<a class="${cls}" href="/${relPath}" target="_blank">${escapeHtml(label)}</a>`;
+  return `<button class="${cls}" data-doc-path="${escapeAttr(relPath)}">${escapeHtml(label)}</button>`;
+}
+async function handleDocLinkClick(btn) {
+  const relPath = btn.dataset.docPath;
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Öffne …';
+  try {
+    const url = await Sync.getSignedUrl(relPath);
+    window.open(url, '_blank');
+  } catch (err) {
+    alert('Datei ist noch nicht in der Cloud verfügbar.\n\nBitte am Mac in Einstellungen auf „Dokumente in Cloud hochladen" klicken, danach hier erneut versuchen.\n\n(' + err.message + ')');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = original;
+  }
 }
 
 function openMailto(c) {
@@ -1245,7 +1277,7 @@ function renderDokumente() {
           <span class="checklist-row-label">${d.label}${d.external ? ' <span class="mini-tag">extern</span>' : ''}</span>
           ${d.note ? `<span class="checklist-row-note">${escapeHtml(d.note)}</span>` : ''}
         </div>
-        ${d.path ? `<a class="btn btn-sm" href="/${d.path}" target="_blank">Öffnen</a>` : ''}
+        ${docLink(d.path, 'Öffnen', 'btn btn-sm')}
         ${d.url ? `<a class="btn btn-sm" href="${d.url}" target="_blank">Öffnen</a>` : ''}
       </div>`).join('');
     const banner = document.getElementById('missingDocsBanner');
@@ -1263,7 +1295,7 @@ function renderDokumente() {
         <span class="doc-box-title">${d.label}</span>
         <span class="doc-status ${d.path ? 'present' : 'missing'}">${d.path ? 'Datei vorhanden' : 'Datei fehlt'}</span>
       </div>
-      ${d.path ? `<div class="doc-meta">${d.path}</div><div class="btn-row" style="margin-top:10px;"><a class="btn btn-sm" href="/${d.path}" target="_blank">Öffnen</a>${window.electronAPI ? `<button class="btn btn-sm finder-btn-general" data-path="${d.path}">Im Finder anzeigen</button>` : ''}</div>` : `<div class="doc-meta">${d.note || ''}</div>`}
+      ${d.path ? `<div class="doc-meta">${d.path}</div><div class="btn-row" style="margin-top:10px;">${docLink(d.path, 'Öffnen', 'btn btn-sm')}${window.electronAPI ? `<button class="btn btn-sm finder-btn-general" data-path="${d.path}">Im Finder anzeigen</button>` : ''}</div>` : `<div class="doc-meta">${d.note || ''}</div>`}
     </div>`).join('');
   document.getElementById('generalDocs').querySelectorAll('.finder-btn-general').forEach(btn => {
     btn.addEventListener('click', (e) => window.electronAPI.showInFinder(e.target.dataset.path));
@@ -1281,7 +1313,7 @@ function renderDokumente() {
             <div><h3 class="cc-name">${c.name}</h3><div class="cc-field">${path ? fileNameFromPath(path) : 'Noch keine Bewerbungsmappe'}</div></div>
           </div>
           <div class="btn-row">
-            ${path ? `<a class="btn btn-sm" href="/${path}" target="_blank">Öffnen</a>` : ''}
+            ${docLink(path, 'Öffnen', 'btn btn-sm')}
             ${window.electronAPI ? `<button class="btn btn-sm doc-finder-link" data-folder="Bewerbungen/${c.folder}">Im Finder</button>` : ''}
             <button class="btn btn-sm doc-detail-link" data-id="${c.id}">Zur Firma</button>
           </div>
@@ -1549,6 +1581,38 @@ function renderEinstellungen() {
   renderIcloudSettings();
 }
 
+// Lädt alle Dokumente (gemeinsame + pro Firma nur *_pdf, wie beim iCloud-
+// Kopiervorgang) über den lokalen server.py (der PROJECT_ROOT vollständig
+// statisch serviert - dieselben Pfade, die schon jedes <a href="/..."> nutzt)
+// zu Supabase Storage hoch. Nur am Mac auslösbar (nur dort existieren die
+// Dateien lokal); die PWA liest sie danach über Sync.getSignedUrl() (siehe
+// docLink/handleDocLinkClick).
+async function uploadDocumentsToCloud(msgEl) {
+  const targets = [];
+  GENERAL_DOCS.forEach(d => { if (d.path) targets.push(d.path); });
+  DATA.companies.forEach(c => {
+    Object.entries(c.documents || {}).forEach(([key, path]) => {
+      if (key.endsWith('_pdf') && path) targets.push(path);
+    });
+  });
+  let uploaded = 0;
+  const errors = [];
+  for (let i = 0; i < targets.length; i++) {
+    const relPath = targets[i];
+    if (msgEl) msgEl.textContent = `Lade hoch … (${i + 1}/${targets.length})`;
+    try {
+      const res = await fetchWithTimeout('/' + relPath);
+      if (!res.ok) throw new Error('lokal nicht gefunden');
+      const blob = await res.blob();
+      await Sync.uploadDocument(relPath, blob);
+      uploaded++;
+    } catch (e) {
+      errors.push(`${relPath}: ${e.message}`);
+    }
+  }
+  return { uploaded, total: targets.length, errors };
+}
+
 // ------------------------------------------------------- iCloud/Kurzbefehl UI
 // Macht die Bewerbungsmappen-PDFs am iPhone/iPad erreichbar, ohne eigenen
 // Cloud-Speicher/Server: iCloud Drive übernimmt den reinen Dateitransport
@@ -1582,16 +1646,43 @@ function renderIcloudSettings() {
       </div>
     </details>`;
 
+  const cloudDocsBlock = Sync.isConfigured() ? `
+    <div style="margin-bottom:18px; padding-bottom:16px; border-bottom:1px solid var(--border);">
+      <p style="font-size:12.8px; color:var(--text-muted); line-height:1.6;">
+        <b>Empfohlen:</b> Lädt Bewerbungsmappen + gemeinsame Dokumente (Lebenslauf, Abitur,
+        Immatrikulation, …) in den privaten Cloud-Speicher (Supabase Storage) hoch. Danach lassen
+        sich alle „Öffnen“-Buttons auch in der PWA am iPhone/iPad direkt antippen — öffnet das
+        Dokument im Browser, von dort per Teilen-Symbol z. B. an Mail weitergeben.
+      </p>
+      <div class="btn-row"><button class="btn btn-primary" id="cloudDocsUploadBtn">Dokumente in Cloud hochladen</button></div>
+      <p id="cloudDocsUploadMsg" style="font-size:12.5px; margin-top:8px;"></p>
+    </div>` : '';
+
   if (window.electronAPI) {
     el.innerHTML = `
+      ${cloudDocsBlock}
       <p style="font-size:12.8px; color:var(--text-muted); line-height:1.6;">
-        Kopiert alle Bewerbungsmappen (+ Abitur/Immatrikulation, falls vorhanden) nach
+        Alternative/Zusatz: Kopiert alle Bewerbungsmappen (+ Abitur/Immatrikulation, falls vorhanden) nach
         <code>iCloud Drive/Praxissemester-Bewerbungen/</code> — nie verschoben, nur zusätzlich kopiert.
-        macOS synct das automatisch, danach erscheinen die Dateien auch in der „Dateien“-App am iPhone/iPad.
+        macOS synct das automatisch, danach erscheinen die Dateien auch in der „Dateien“-App am iPhone/iPad
+        (nötig für den optionalen Kurzbefehl-Weg unten).
       </p>
-      <div class="btn-row"><button class="btn btn-primary" id="icloudSyncBtn">Dokumente nach iCloud kopieren</button></div>
+      <div class="btn-row"><button class="btn" id="icloudSyncBtn">Dokumente nach iCloud kopieren</button></div>
       <p id="icloudSyncMsg" style="font-size:12.5px; margin-top:8px;"></p>
       ${guide}`;
+    document.getElementById('cloudDocsUploadBtn')?.addEventListener('click', async () => {
+      const msgEl = document.getElementById('cloudDocsUploadMsg');
+      const btn = document.getElementById('cloudDocsUploadBtn');
+      btn.disabled = true;
+      try {
+        const res = await uploadDocumentsToCloud(msgEl);
+        msgEl.textContent = `✓ ${res.uploaded}/${res.total} Datei(en) hochgeladen.` + (res.errors.length ? ` ${res.errors.length} Fehler: ${res.errors.slice(0, 3).join('; ')}${res.errors.length > 3 ? ' …' : ''}` : '');
+      } catch (e) {
+        msgEl.textContent = 'Fehler: ' + e.message;
+      } finally {
+        btn.disabled = false;
+      }
+    });
     document.getElementById('icloudSyncBtn').addEventListener('click', async () => {
       const msgEl = document.getElementById('icloudSyncMsg');
       msgEl.textContent = 'Kopiere …';
@@ -1606,9 +1697,9 @@ function renderIcloudSettings() {
   } else {
     el.innerHTML = `
       <p style="font-size:12.8px; color:var(--text-muted); line-height:1.6;">
-        Die Dokumente werden über die Mac-App nach iCloud Drive kopiert (Button dort in
-        „Einstellungen“) — von hier aus nicht auslösbar. Sind sie einmal kopiert, tauchen sie
-        automatisch auch hier auf und der Kurzbefehl kann sie beim E-Mail-Vorbereiten anhängen.
+        Dokumente werden über die Mac-App hochgeladen (Button dort in „Einstellungen“) — von hier
+        aus nicht auslösbar. Danach lassen sich alle „Öffnen“-Buttons in der App direkt antippen.
+        Zusätzlich landen sie auch in iCloud Drive für den optionalen Kurzbefehl-Weg unten.
       </p>
       ${guide}`;
   }
