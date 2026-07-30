@@ -450,6 +450,9 @@ textarea.notes::placeholder { color: var(--text-faint); }
     background: var(--sidebar-bg); backdrop-filter: blur(20px);
     border-bottom: 1px solid var(--border);
     padding: 14px 16px;
+    /* .main-content hat eigenes Padding - negative Ränder ziehen die Leiste
+       bis an den Bildschirmrand, statt mit Lücken links/rechts zu schweben. */
+    margin: -18px -16px 16px;
   }
   .mobile-menu-btn {
     background: none; border: none; color: var(--text); font-size: 19px;
