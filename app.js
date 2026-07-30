@@ -859,7 +859,11 @@ function renderEmailWorkflowBox(c) {
   if (!hasEmail && !hasPortal) return '';
   // Echte Cloud-PWA (iPhone/iPad ohne lokalen server.py): weder das Electron-
   // AppleScript noch der /api/.../prepare-email-Weg funktionieren hier (kein
-  // Backend erreichbar) - dafür der Kurzbefehl-Weg, siehe openShortcutMail().
+  // Backend erreichbar). Primärer, garantiert funktionierender Weg ist mailto:
+  // + manuelles Anhängen aus der Dateien-App (Dokumente liegen über iCloud
+  // Drive dort bereits bereit, siehe Einstellungen). Der Kurzbefehl-Weg
+  // (openShortcutMail) bleibt als optionaler Zusatz bestehen, für alle, die
+  // ihn sich einrichten möchten - siehe Einstellungen, Abschnitt iCloud.
   const cloudPwa = !window.electronAPI && !LOCAL_MODE;
 
   return `
@@ -870,17 +874,20 @@ function renderEmailWorkflowBox(c) {
         ${window.electronAPI
           ? '„Mail-Entwurf mit Anhang öffnen“ öffnet ein echtes, bearbeitbares Mail.app-Fenster mit Empfänger, Betreff, Text und der Bewerbungsmappe bereits angehängt — dort nur noch kurz prüfen und selbst auf Senden klicken. (Ein bloß geöffnetes .eml zeigt in Mail.app nur eine Vorschau ohne Senden-Button — deshalb dieser Weg.)'
           : cloudPwa
-          ? '„Mail mit Anhang vorbereiten“ ruft den Kurzbefehl „' + SHORTCUT_NAME + '“ auf, der Empfänger/Betreff/Text setzt und die Dokumente aus iCloud Drive anhängt — Mail öffnet sich als fertiger Entwurf zum Prüfen, gesendet wird immer nur von dir selbst. Voraussetzung: der Kurzbefehl ist eingerichtet (siehe Einstellungen) und die Dokumente wurden einmal über die Mac-App nach iCloud kopiert.'
+          ? '„mailto: öffnen“ startet Mail mit Empfänger/Betreff/Text bereits ausgefüllt. Anhang danach kurz selbst hinzufügen: in Mail auf das Büroklammer-Symbol → „Datei durchsuchen“ → Dateien-App → iCloud Drive → Praxissemester-Bewerbungen → ' + escapeHtml(c.folder || '<Firma>') + ' → Bewerbungsmappe auswählen (Voraussetzung: einmal über die Mac-App nach iCloud kopiert, siehe Einstellungen).'
           : 'Bester Weg: „.eml mit Anhang erzeugen“ legt eine fertige E-Mail inkl. Bewerbungsmappe als Anhang an. Browser können .eml-Dateien meist nur herunterladen, nicht direkt als Entwurf öffnen — die heruntergeladene Datei danach in Mail/Outlook öffnen und dort senden.'}
-        mailto: bleibt als Fallback (öffnet ohne Anhang, Anhang danach manuell hinzufügen; technisch bedingt, mailto: kann keine Dateien anhängen).
+        ${cloudPwa ? '' : 'mailto: bleibt als Fallback (öffnet ohne Anhang, Anhang danach manuell hinzufügen; technisch bedingt, mailto: kann keine Dateien anhängen).'}
       </p>
       <div class="btn-row">
         ${cloudPwa
-          ? `<button class="btn btn-primary" id="prepShortcutBtn">✉️ Mail mit Anhang vorbereiten (Kurzbefehl)</button>`
-          : `<button class="btn btn-primary" id="prepEmlBtn">${window.electronAPI ? '✉️ Mail-Entwurf mit Anhang öffnen' : '📎 .eml mit Anhang erzeugen'}</button>`}
-        <button class="btn" id="prepMailBtn">mailto: öffnen (ohne Anhang)</button>
+          ? `<button class="btn btn-primary" id="prepMailBtn">✉️ mailto: öffnen (Anhang danach selbst hinzufügen)</button>`
+          : `<button class="btn btn-primary" id="prepEmlBtn">${window.electronAPI ? '✉️ Mail-Entwurf mit Anhang öffnen' : '📎 .eml mit Anhang erzeugen'}</button>
+        <button class="btn" id="prepMailBtn">mailto: öffnen (ohne Anhang)</button>`}
         <button class="btn" id="markSentBtn" ${alreadySent ? 'disabled' : ''}>${alreadySent ? '✓ Bereits als versendet markiert' : 'Als versendet markieren'}</button>
       </div>
+      ${cloudPwa ? `<div class="btn-row" style="margin-top:8px;">
+        <button class="btn btn-sm" id="prepShortcutBtn">✉️ Stattdessen Kurzbefehl versuchen (optional, falls eingerichtet)</button>
+      </div>` : ''}
       <div class="btn-row" style="margin-top:8px;">
         <button class="btn btn-sm" data-copy="${escapeAttr(c.email)}">E-Mail-Adresse kopieren</button>
         <button class="btn btn-sm" id="copyEmailTextBtn">E-Mail-Text kopieren</button>
