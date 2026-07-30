@@ -1419,7 +1419,12 @@ function renderLoginGate() {
     msgEl.textContent = 'Melde an …';
     try {
       await Sync.signIn(emailEl.value.trim(), pwEl.value);
-      init();
+      // renderLoginGate() replaced the whole .main-content DOM (all .page
+      // sections), so calling init() again in-place has nothing to render
+      // into - a full reload re-fetches the real index.html structure fresh.
+      // The session is already in localStorage by now, so this lands
+      // straight on the dashboard instead of showing the gate again.
+      window.location.reload();
     } catch (e) {
       msgEl.textContent = 'Fehler: ' + e.message;
     }
@@ -1428,10 +1433,12 @@ function renderLoginGate() {
     msgEl.textContent = 'Registriere …';
     try {
       const { needsEmailConfirmation } = await Sync.signUp(emailEl.value.trim(), pwEl.value);
-      msgEl.textContent = needsEmailConfirmation
-        ? '✓ Konto erstellt — bitte Bestätigungslink in der E-Mail öffnen, danach hier anmelden.'
-        : 'Konto erstellt, angemeldet …';
-      if (!needsEmailConfirmation) init();
+      if (needsEmailConfirmation) {
+        msgEl.textContent = '✓ Konto erstellt — bitte Bestätigungslink in der E-Mail öffnen, danach hier anmelden.';
+      } else {
+        msgEl.textContent = 'Konto erstellt, angemeldet …';
+        window.location.reload();
+      }
     } catch (e) {
       msgEl.textContent = 'Fehler: ' + e.message;
     }
