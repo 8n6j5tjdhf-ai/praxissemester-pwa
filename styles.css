@@ -49,10 +49,12 @@
   --info-bg: rgba(110, 163, 255, 0.14);
   --muted-bg: rgba(255, 255, 255, 0.06);
 
-  /* --- shape / motion --- */
-  --radius-sm: 8px;
-  --radius-md: 14px;
-  --radius-lg: 20px;
+  /* --- shape / motion ---
+     Größere, "kontinuierliche" Radien wie bei nativen Apple-Oberflächen
+     (Control Center, Kontextmenüs) - gilt für Mac und Handy gleichermaßen. */
+  --radius-sm: 12px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
   --shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.28);
   --shadow-md: 0 10px 30px rgba(0, 0, 0, 0.38);
   --shadow-glow: 0 0 0 1px var(--accent-border), 0 8px 24px rgba(110, 100, 240, 0.18);
@@ -94,7 +96,7 @@ a:hover { text-decoration: underline; }
   width: var(--sidebar-width);
   flex-shrink: 0;
   background: var(--sidebar-bg);
-  backdrop-filter: blur(20px);
+  backdrop-filter: blur(28px) saturate(180%);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
@@ -186,14 +188,14 @@ a:hover { text-decoration: underline; }
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  backdrop-filter: blur(16px);
+  backdrop-filter: blur(24px) saturate(170%);
   box-shadow: var(--shadow-sm);
 }
 
 .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(148px, 1fr)); gap: 12px; margin-bottom: 22px; }
 .kpi-card {
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md);
-  padding: 16px 16px 14px; backdrop-filter: blur(16px); transition: transform .15s var(--ease), border-color .15s var(--ease);
+  padding: 16px 16px 14px; backdrop-filter: blur(24px) saturate(170%); transition: transform .15s var(--ease), border-color .15s var(--ease);
 }
 .kpi-card:hover { border-color: var(--border-strong); transform: translateY(-1px); }
 .kpi-num { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; }
@@ -229,6 +231,7 @@ a:hover { text-decoration: underline; }
 .banner {
   background: var(--warning-bg); border: 1px solid var(--warning-border); color: var(--text);
   border-radius: var(--radius-md); padding: 13px 16px; font-size: 12.8px; line-height: 1.55; margin-bottom: 22px;
+  backdrop-filter: blur(20px) saturate(150%);
 }
 .banner strong { color: var(--warning); }
 .callout { border-radius: var(--radius-md); padding: 13px 16px; font-size: 12.8px; line-height: 1.55; border: 1px solid var(--border); background: var(--surface); }
@@ -273,7 +276,7 @@ select.status-select {
 .company-list { display: flex; flex-direction: column; gap: 12px; }
 .company-card {
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
-  padding: 16px 18px; backdrop-filter: blur(16px); cursor: pointer;
+  padding: 16px 18px; backdrop-filter: blur(24px) saturate(170%); cursor: pointer;
   transition: border-color .12s var(--ease), background .12s var(--ease);
 }
 .company-card:hover { border-color: var(--border-strong); background: var(--surface-hover); }
@@ -356,7 +359,7 @@ textarea.notes {
 textarea.notes::placeholder { color: var(--text-faint); }
 
 /* =============================================================== docs */
-.doc-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px; margin: 14px 0; }
+.doc-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px; margin: 14px 0; backdrop-filter: blur(24px) saturate(170%); }
 .doc-box-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
 .doc-box-title { font-size: 13px; font-weight: 700; }
 .doc-status { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; }
@@ -380,7 +383,7 @@ textarea.notes::placeholder { color: var(--text-faint); }
 
 /* =============================================================== checklist */
 .checklist { display: flex; flex-direction: column; gap: 8px; }
-.checklist label { display: flex; align-items: flex-start; gap: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 13px; font-size: 13px; cursor: pointer; }
+.checklist label { display: flex; align-items: flex-start; gap: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 13px; font-size: 13px; cursor: pointer; backdrop-filter: blur(24px) saturate(170%); }
 .checklist label.checked { background: var(--success-bg); border-color: var(--success-border); }
 .checklist label.checked span { text-decoration: line-through; color: var(--text-muted); }
 .checklist input { margin-top: 2px; accent-color: var(--accent); }
@@ -499,13 +502,4 @@ textarea.notes::placeholder { color: var(--text-faint); }
   .page-title { font-size: 19px; }
   .kpi-num { font-size: 21px; }
   .btn { padding: 9px 14px; }
-
-  /* Größere, "kontinuierliche" Eckenradien wie native iOS-Oberflächen (Karten,
-     Sheets, Buttons) - da fast alle Komponenten bereits über diese Variablen
-     gehen, reicht eine zentrale Anpassung statt vieler Einzelregeln. Farben
-     bleiben unverändert, nur Form/Material wird "glasiger". */
-  :root { --radius-lg: 24px; --radius-md: 16px; --radius-sm: 12px; }
-  .glass-card, .kpi-card, .doc-box, .checklist label, .banner {
-    backdrop-filter: blur(24px) saturate(170%);
-  }
 }
