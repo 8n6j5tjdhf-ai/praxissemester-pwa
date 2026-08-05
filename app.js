@@ -101,6 +101,8 @@ const DEFAULT_PRIMARY_DOCUMENT = 'bewerbungsmappe_pdf';
 const GENERAL_DOCS = [
   { label: 'Lebenslauf (DE, mit Foto, PDF)', path: 'Lebenslauf/Lebenslauf_Pedro_Kraemer_DE_mit_Foto.pdf' },
   { label: 'Lebenslauf (DE, mit Foto, DOCX)', path: 'Lebenslauf/Lebenslauf_Pedro_Kraemer_DE_mit_Foto.docx' },
+  { label: 'Lebenslauf (DE, ohne Foto, PDF)', path: 'Lebenslauf/Lebenslauf_Pedro_Kraemer_DE.pdf' },
+  { label: 'Lebenslauf (DE, ohne Foto, DOCX)', path: 'Lebenslauf/Lebenslauf_Pedro_Kraemer_DE.docx' },
   { label: 'Notenübersicht', path: 'Lebenslauf/Notenuebersicht_Pedro_Kraemer.pdf' },
   { label: 'Abiturzeugnis', path: 'Abiturzeugnis/2023_07_06_Abitur.pdf' },
   { label: 'Immatrikulationsbescheinigung (SoSe 2026, 4. Fachsemester)', path: IMMATRIKULATION_PATH },
@@ -856,6 +858,11 @@ function renderBewerbungsmappeBox(c) {
         <span class="doc-status ${present ? 'present' : 'missing'}">${present ? 'Datei vorhanden' : 'Datei fehlt'}</span>
       </div>
       ${present ? `<div class="doc-meta">Dateiname: <b>${fileNameFromPath(primaryPath)}</b><br>Speicherort: ${primaryPath}</div>` : '<div class="doc-meta">Noch nicht generiert — auf „Neu generieren“ klicken.</div>'}
+      <div class="doc-meta" style="margin-top:10px;">Lebenslauf-Variante (Bewerbungsfoto ist in Deutschland inzwischen optional — bei traditionelleren Firmen weiterhin üblich, bei moderneren/internationalen oft bewusst weggelassen):</div>
+      <div class="btn-row" style="margin-top:6px;">
+        <label class="mappe-opt"><input type="radio" name="cvVariant-${c.id}" class="cv-variant-radio" value="mit_foto" ${(c.cvVariant || 'mit_foto') === 'mit_foto' ? 'checked' : ''}><span>Mit Foto</span></label>
+        <label class="mappe-opt"><input type="radio" name="cvVariant-${c.id}" class="cv-variant-radio" value="ohne_foto" ${c.cvVariant === 'ohne_foto' ? 'checked' : ''}><span>Ohne Foto</span></label>
+      </div>
       <div class="doc-meta" style="margin-top:10px;">Standard-Inhalt: Anschreiben, Lebenslauf, Notenübersicht. Zusätzlich mitschicken (wird beim E-Mail-Versand als eigene, separate Datei angehängt — für eine gemeinsame PDF stattdessen unten "Neue Version generieren" klicken):</div>
       <div class="mappe-opts">${optionRows}</div>
       <div class="btn-row" style="margin-top:12px;">
@@ -1161,6 +1168,12 @@ function attachDocAndTimelineHandlers(root, c) {
     // a regenerate step. "Neue Version generieren" still merges it into one
     // PDF for people who explicitly want that (e.g. for a portal upload).
     scheduleSave();
+  }));
+  root.querySelectorAll('.cv-variant-radio').forEach(radio => radio.addEventListener('change', (e) => {
+    if (!e.target.checked) return;
+    c.cvVariant = e.target.value;
+    scheduleSave();
+    if (msgEl) msgEl.textContent = 'Gespeichert — auf „Neue Version generieren“ klicken, damit die Bewerbungsmappe die neue Lebenslauf-Variante enthält.';
   }));
   root.querySelector('.regen-btn')?.addEventListener('click', () => regenerateDocuments(c, msgEl));
   root.querySelector('.replace-btn')?.addEventListener('click', () => root.querySelector('.replace-input').click());
